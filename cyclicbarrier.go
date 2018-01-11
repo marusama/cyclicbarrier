@@ -16,7 +16,8 @@ type CyclicBarrier interface {
 }
 
 type cyclicBarrier struct {
-	parties int
+	parties       int
+	barrierAction func()
 
 	lock   sync.Mutex
 	count  int
@@ -31,6 +32,18 @@ func New(parties int) CyclicBarrier {
 	return &cyclicBarrier{
 		parties: parties,
 		waitCh:  waitCh,
+	}
+}
+
+func NewWithAction(parties int, barrierAction func()) CyclicBarrier {
+	if parties <= 0 {
+		panic("parties must be positive number")
+	}
+	waitCh := make(chan struct{})
+	return &cyclicBarrier{
+		parties:       parties,
+		barrierAction: barrierAction,
+		waitCh:        waitCh,
 	}
 }
 
@@ -62,6 +75,9 @@ func (b *cyclicBarrier) Await(ctx context.Context) error {
 		}
 	} else {
 		// we are last, break the barrier
+		if b.barrierAction != nil {
+			b.barrierAction()
+		}
 		b.Reset()
 	}
 

@@ -93,3 +93,33 @@ func TestAwaitMany(t *testing.T) {
 	wg.Wait()
 	checkBarrier(t, b, n, 0)
 }
+
+func TestAwaitAction(t *testing.T) {
+	n := 100  // goroutines count
+	m := 1000 // inner cycle count
+
+	cnt := 0
+	b := NewWithAction(n, func() {
+		cnt++
+	})
+
+	wg := sync.WaitGroup{}
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func() {
+			for j := 0; j < m; j++ {
+				err := b.Await(nil)
+				if err != nil {
+					panic(err)
+				}
+			}
+			wg.Done()
+		}()
+	}
+
+	wg.Wait()
+	checkBarrier(t, b, n, 0)
+	if cnt != m {
+		t.Error("cnt must be equal to = ", m, ", but it's ", cnt)
+	}
+}
