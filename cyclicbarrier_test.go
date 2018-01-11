@@ -1,8 +1,6 @@
 package cyclicbarrier
 
 import (
-	"context"
-	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -38,41 +36,39 @@ func TestAwaitOnce(t *testing.T) {
 	checkBarrier(t, b, n, 0)
 }
 
-func TestAwaitOnce2(t *testing.T) {
+func TestAwaitStepByStep(t *testing.T) {
 	b := New(3)
 
-	ch := make(chan struct{})
+	ch := [3]chan struct{}{}
+	ch[0] = make(chan struct{})
+	ch[1] = make(chan struct{})
+	ch[2] = make(chan struct{})
+
+	wg := sync.WaitGroup{}
 	for i := 0; i < 3; i++ {
+		wg.Add(1)
 		go func(n int) {
-			if n == 0 {
-				time.Sleep(5 * time.Second)
-			}
+			time.Sleep(time.Duration(100*(n+1)) * time.Millisecond)
+			ch[n] <- struct{}{}
 			err := b.Await(nil)
 			if err != nil {
 				panic(err)
 			}
-			ch <- struct{}{}
+			wg.Done()
 		}(i)
 	}
 
-	<-ch // first gorouitine done
-	<-ch // second goroutine done
+	checkBarrier(t, b, 3, 0)
 
-	ticker := time.NewTimer(100 * time.Millisecond)
-	ctx, _ := context.WithTimeout(context.Background(), time.Second)
+	<-ch[0]
+	checkBarrier(t, b, 3, 1)
 
-	select {
-	case <-ch: // third gorouitine done
-		t.Error("third goroutine must not arrive earlier")
-		return
-	case <-time.After(1 * time.Second):
-		fmt.Println("HELLO")
-		//checkBarrier(t, b, 3, 2)
-	case <-ticker.C:
-		fmt.Println("HELLO 2")
-	case <-ctx.Done():
-		fmt.Println("HELLO 3")
-	}
+	<-ch[1]
+	checkBarrier(t, b, 3, 2)
+
+	<-ch[2]
+	wg.Wait()
+	checkBarrier(t, b, 3, 0)
 }
 
 func TestAwaitMany(t *testing.T) {
