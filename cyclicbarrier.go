@@ -7,7 +7,6 @@ package cyclicbarrier // import "github.com/marusama/cyclicbarrier"
 
 import (
 	"context"
-	"errors"
 	"sync"
 )
 
@@ -15,11 +14,6 @@ type CyclicBarrier interface {
 	Await(ctx context.Context) error
 	Reset()
 }
-
-var (
-	// ErrCtxDone predefined error - context is cancelled.
-	ErrCtxDone = errors.New("ctx.Done()")
-)
 
 type cyclicBarrier struct {
 	parties int
@@ -61,6 +55,7 @@ func (b *cyclicBarrier) Await(ctx context.Context) error {
 			select {
 			case <-waitCh:
 			case <-ctx.Done():
+				return ctx.Err()
 			}
 		} else {
 			<-waitCh
