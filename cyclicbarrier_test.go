@@ -148,8 +148,8 @@ func TestAwaitManyCtxDone(t *testing.T) {
 }
 
 func TestAwaitAction(t *testing.T) {
-	n := 1 // goroutines count
-	m := 1 // inner cycle count
+	n := 100  // goroutines count
+	m := 1000 // inner cycle count
 
 	cnt := 0
 	b := NewWithAction(n, func() {
