@@ -7,7 +7,9 @@ package cyclicbarrier // import "github.com/marusama/cyclicbarrier"
 
 import (
 	"context"
+	"runtime"
 	"sync"
+	"sync/atomic"
 )
 
 // CyclicBarrier is a synchronizer that allows a set of goroutines to wait for each other
@@ -29,7 +31,10 @@ type cyclicBarrier struct {
 	count  int
 	waitCh chan struct{}
 
-	bufCh chan struct{}
+	waiters int32
+
+	// bufCh   chan struct{}
+	// inReset int32
 }
 
 // New initializes a new instance of the CyclicBarrier, specifying the number of parties.
@@ -38,13 +43,13 @@ func New(parties int) CyclicBarrier {
 		panic("parties must be positive number")
 	}
 	waitCh := make(chan struct{})
-	bufCh := make(chan struct{}, parties-1)
+	//bufCh := make(chan struct{}, parties-1)
 	return &cyclicBarrier{
 		parties: parties,
 		waitCh:  waitCh,
 		lock:    &sync.Mutex{},
 
-		bufCh: bufCh,
+		//bufCh: bufCh,
 	}
 }
 
@@ -63,48 +68,45 @@ func NewWithAction(parties int, barrierAction func()) CyclicBarrier {
 	}
 }
 
+// func (b *cyclicBarrier) Await(ctx context.Context) error {
+// 	var ctxDoneCh <-chan struct{}
+// 	if ctx != nil {
+// 		ctxDoneCh = ctx.Done()
+// 	}
+
+// 	select {
+// 	case b.bufCh <- struct{}{}:
+// 		select {
+// 		case <-b.waitCh:
+// 		case <-ctxDoneCh:
+// 			return ctx.Err()
+// 		}
+// 	case <-ctxDoneCh:
+// 		b.Reset()
+// 		return ctx.Err()
+// 	default:
+// 		if b.barrierAction != nil {
+// 			b.barrierAction()
+// 		}
+// 		b.Reset()
+// 	}
+// 	return nil
+// }
+
+// func (b *cyclicBarrier) Reset() {
+// 	b.lock.Lock()
+// 	defer b.lock.Unlock()
+
+// 	for i := 0; i < b.parties-1; i++ {
+// 		<-b.bufCh
+// 	}
+
+// 	close(b.waitCh)
+// 	b.waitCh = make(chan struct{})
+// }
+
+//func (b *cyclicBarrier) Await(ctx context.Context, num int) error {
 func (b *cyclicBarrier) Await(ctx context.Context) error {
-	var ctxDoneCh <-chan struct{}
-	if ctx != nil {
-		ctxDoneCh = ctx.Done()
-	}
-
-	b.lock.Lock()
-	select {
-	case b.bufCh <- struct{}{}:
-		b.lock.Unlock()
-		select {
-		case <-b.waitCh:
-		case <-ctxDoneCh:
-			return ctx.Err()
-		}
-	case <-ctxDoneCh:
-		b.lock.Unlock()
-		b.Reset()
-		return ctx.Err()
-	default:
-		b.lock.Unlock()
-		if b.barrierAction != nil {
-			b.barrierAction()
-		}
-		b.Reset()
-	}
-	return nil
-}
-
-func (b *cyclicBarrier) Reset() {
-	b.lock.Lock()
-	defer b.lock.Unlock()
-
-	for i := 0; i < b.parties-1; i++ {
-		<-b.bufCh
-	}
-
-	close(b.waitCh)
-	b.waitCh = make(chan struct{})
-}
-
-func (b *cyclicBarrier) AwaitOld(ctx context.Context, num int) error {
 
 	var ctxDoneCh <-chan struct{}
 	if ctx != nil {
@@ -121,13 +123,13 @@ func (b *cyclicBarrier) AwaitOld(ctx context.Context, num int) error {
 
 	b.lock.Unlock()
 
-	println(num, "count++", count)
+	//println(num, "count++", count)
 
 	// decrement count
 	decrementFunc := func() {
 		b.lock.Lock()
 		b.count--
-		println(num, "count--", b.count)
+		//println(num, "count--", b.count)
 		b.lock.Unlock()
 	}
 
@@ -136,19 +138,23 @@ func (b *cyclicBarrier) AwaitOld(ctx context.Context, num int) error {
 	}
 
 	if count < b.parties {
-		println(num, "wait")
+		//println(num, "wait")
+
+		atomic.AddInt32(&b.waiters, 1)
 
 		// wait other parties
 		select {
 		case <-waitCh:
 			decrementFunc()
+			atomic.AddInt32(&b.waiters, -1)
 			return nil
 		case <-ctxDoneCh:
 			decrementFunc()
+			atomic.AddInt32(&b.waiters, -1)
 			return ctx.Err()
 		}
 	} else {
-		println(num, "reset")
+		//println(num, "reset")
 		// we are last, run the barrier action and break the barrier
 		if b.barrierAction != nil {
 			b.barrierAction()
@@ -156,11 +162,22 @@ func (b *cyclicBarrier) AwaitOld(ctx context.Context, num int) error {
 		decrementFunc()
 		b.Reset()
 
+		// wait all done
+		for {
+			w := atomic.LoadInt32(&b.waiters)
+			println(w)
+			if w != 0 {
+				runtime.Gosched()
+			} else {
+				break
+			}
+		}
+
 		return nil
 	}
 }
 
-func (b *cyclicBarrier) ResetOld() {
+func (b *cyclicBarrier) Reset() {
 	b.lock.Lock()
 
 	close(b.waitCh)
