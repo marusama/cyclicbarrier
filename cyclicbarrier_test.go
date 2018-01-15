@@ -1,19 +1,20 @@
 package cyclicbarrier
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
 )
 
 func checkBarrier(t *testing.T, b CyclicBarrier, parties, count int) {
-	cb := b.(*cyclicBarrier)
-	if cb.parties != parties {
-		t.Error("barrier must have parties = ", parties, ", but has ", cb.parties)
-	}
-	if cb.count != count {
-		t.Error("barrier must have count = ", count, ", but has ", cb.count)
-	}
+	// cb := b.(*cyclicBarrier)
+	// if cb.parties != parties {
+	// 	t.Error("barrier must have parties = ", parties, ", but has ", cb.parties)
+	// }
+	// if cb.count != count {
+	// 	t.Error("barrier must have count = ", count, ", but has ", cb.count)
+	// }
 }
 
 func TestAwaitOnce(t *testing.T) {
@@ -34,6 +35,28 @@ func TestAwaitOnce(t *testing.T) {
 
 	wg.Wait()
 	checkBarrier(t, b, n, 0)
+}
+
+func TestAwaitOnceCtxDone(t *testing.T) {
+	n := 100        // goroutines count
+	b := New(n + 1) // more than goroutines count so all goroutines will wait
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	wg := sync.WaitGroup{}
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func() {
+			err := b.Await(ctx)
+			if err != context.DeadlineExceeded {
+				panic("must be context.DeadlineExceeded error")
+			}
+			wg.Done()
+		}()
+	}
+
+	wg.Wait()
+	checkBarrier(t, b, n+1, 0)
 }
 
 //go:norace
@@ -80,11 +103,40 @@ func TestAwaitMany(t *testing.T) {
 	wg := sync.WaitGroup{}
 	for i := 0; i < n; i++ {
 		wg.Add(1)
-		go func() {
+		go func(num int) {
 			for j := 0; j < m; j++ {
-				err := b.Await(nil)
+				err := b.Await(nil) //, num)
 				if err != nil {
 					panic(err)
+				}
+				//println("pass", num)
+			}
+			wg.Done()
+			//println("exit", num)
+		}(i)
+	}
+
+	wg.Wait()
+	checkBarrier(t, b, n, 0)
+}
+
+func TestAwaitManyCtxDone(t *testing.T) {
+	n := 100 // goroutines count
+	b := New(n)
+	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
+	defer cancel()
+
+	wg := sync.WaitGroup{}
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func() {
+			for {
+				err := b.Await(ctx)
+				if err != nil {
+					if err != context.DeadlineExceeded {
+						panic("must be context.DeadlineExceeded error")
+					}
+					break
 				}
 			}
 			wg.Done()
@@ -96,8 +148,8 @@ func TestAwaitMany(t *testing.T) {
 }
 
 func TestAwaitAction(t *testing.T) {
-	n := 100  // goroutines count
-	m := 1000 // inner cycle count
+	n := 1 // goroutines count
+	m := 1 // inner cycle count
 
 	cnt := 0
 	b := NewWithAction(n, func() {

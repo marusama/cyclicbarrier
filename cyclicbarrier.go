@@ -25,9 +25,11 @@ type cyclicBarrier struct {
 	parties       int
 	barrierAction func()
 
-	lock   sync.Mutex
+	lock   *sync.Mutex
 	count  int
 	waitCh chan struct{}
+
+	bufCh chan struct{}
 }
 
 // New initializes a new instance of the CyclicBarrier, specifying the number of parties.
@@ -36,9 +38,13 @@ func New(parties int) CyclicBarrier {
 		panic("parties must be positive number")
 	}
 	waitCh := make(chan struct{})
+	bufCh := make(chan struct{}, parties-1)
 	return &cyclicBarrier{
 		parties: parties,
 		waitCh:  waitCh,
+		lock:    &sync.Mutex{},
+
+		bufCh: bufCh,
 	}
 }
 
@@ -53,11 +59,59 @@ func NewWithAction(parties int, barrierAction func()) CyclicBarrier {
 		parties:       parties,
 		barrierAction: barrierAction,
 		waitCh:        waitCh,
+		lock:          &sync.Mutex{},
 	}
 }
 
 func (b *cyclicBarrier) Await(ctx context.Context) error {
+	var ctxDoneCh <-chan struct{}
+	if ctx != nil {
+		ctxDoneCh = ctx.Done()
+	}
 
+	b.lock.Lock()
+	select {
+	case b.bufCh <- struct{}{}:
+		b.lock.Unlock()
+		select {
+		case <-b.waitCh:
+		case <-ctxDoneCh:
+			return ctx.Err()
+		}
+	case <-ctxDoneCh:
+		b.lock.Unlock()
+		b.Reset()
+		return ctx.Err()
+	default:
+		b.lock.Unlock()
+		if b.barrierAction != nil {
+			b.barrierAction()
+		}
+		b.Reset()
+	}
+	return nil
+}
+
+func (b *cyclicBarrier) Reset() {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
+	for i := 0; i < b.parties-1; i++ {
+		<-b.bufCh
+	}
+
+	close(b.waitCh)
+	b.waitCh = make(chan struct{})
+}
+
+func (b *cyclicBarrier) AwaitOld(ctx context.Context, num int) error {
+
+	var ctxDoneCh <-chan struct{}
+	if ctx != nil {
+		ctxDoneCh = ctx.Done()
+	}
+
+	// increment count
 	b.lock.Lock()
 	b.count++
 
@@ -67,36 +121,48 @@ func (b *cyclicBarrier) Await(ctx context.Context) error {
 
 	b.lock.Unlock()
 
+	println(num, "count++", count)
+
+	// decrement count
+	decrementFunc := func() {
+		b.lock.Lock()
+		b.count--
+		println(num, "count--", b.count)
+		b.lock.Unlock()
+	}
+
 	if count > b.parties {
 		panic("CyclicBarrier.Await is called more than total parties count times")
 	}
 
 	if count < b.parties {
+		println(num, "wait")
+
 		// wait other parties
-		if ctx != nil {
-			select {
-			case <-waitCh:
-			case <-ctx.Done():
-				return ctx.Err()
-			}
-		} else {
-			<-waitCh
+		select {
+		case <-waitCh:
+			decrementFunc()
+			return nil
+		case <-ctxDoneCh:
+			decrementFunc()
+			return ctx.Err()
 		}
 	} else {
-		// we are last, break the barrier
+		println(num, "reset")
+		// we are last, run the barrier action and break the barrier
 		if b.barrierAction != nil {
 			b.barrierAction()
 		}
+		decrementFunc()
 		b.Reset()
-	}
 
-	return nil
+		return nil
+	}
 }
 
-func (b *cyclicBarrier) Reset() {
+func (b *cyclicBarrier) ResetOld() {
 	b.lock.Lock()
 
-	b.count = 0
 	close(b.waitCh)
 	b.waitCh = make(chan struct{})
 
