@@ -10,11 +10,17 @@ import (
 	"sync"
 )
 
+// CyclicBarrier is a synchronizer that allows a set of goroutines to wait for each other
+// to reach a common execution point, also called a barrier.
 type CyclicBarrier interface {
+	// Await waits until all parties have invoked await on this barrier.
 	Await(ctx context.Context) error
+
+	// Reset resets the barrier to its initial state.
 	Reset()
 }
 
+// cyclicBarrier impl CyclicBarrier intf
 type cyclicBarrier struct {
 	parties       int
 	barrierAction func()
@@ -24,6 +30,7 @@ type cyclicBarrier struct {
 	waitCh chan struct{}
 }
 
+// New initializes a new instance of the CyclicBarrier, specifying the number of parties.
 func New(parties int) CyclicBarrier {
 	if parties <= 0 {
 		panic("parties must be positive number")
@@ -35,6 +42,8 @@ func New(parties int) CyclicBarrier {
 	}
 }
 
+// NewWithAction initializes a new instance of the CyclicBarrier,
+// specifying the number of parties and the barrier action.
 func NewWithAction(parties int, barrierAction func()) CyclicBarrier {
 	if parties <= 0 {
 		panic("parties must be positive number")

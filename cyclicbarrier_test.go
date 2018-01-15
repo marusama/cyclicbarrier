@@ -36,6 +36,7 @@ func TestAwaitOnce(t *testing.T) {
 	checkBarrier(t, b, n, 0)
 }
 
+//go:norace
 func TestAwaitStepByStep(t *testing.T) {
 	b := New(3)
 
