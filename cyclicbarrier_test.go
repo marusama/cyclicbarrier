@@ -25,6 +25,75 @@ func checkBarrier(t *testing.T, b CyclicBarrier,
 	}
 }
 
+func TestNew(t *testing.T) {
+	tests := []func(){
+		func() {
+			b := New(10)
+			checkBarrier(t, b, 10, 0, false)
+			if b.(*cyclicBarrier).barrierAction != nil {
+				t.Error("barrier have unexpected barrierAction")
+			}
+		},
+		func() {
+			defer func() {
+				if recover() == nil {
+					t.Error("Panic expected")
+				}
+			}()
+			_ = New(0)
+		},
+		func() {
+			defer func() {
+				if recover() == nil {
+					t.Error("Panic expected")
+				}
+			}()
+			_ = New(-1)
+		},
+	}
+	for _, test := range tests {
+		test()
+	}
+}
+
+func TestNewWithAction(t *testing.T) {
+	tests := []func(){
+		func() {
+			b := NewWithAction(10, func() error { return nil })
+			checkBarrier(t, b, 10, 0, false)
+			if b.(*cyclicBarrier).barrierAction == nil {
+				t.Error("barrier doesn't have expected barrierAction")
+			}
+		},
+		func() {
+			b := NewWithAction(10, nil)
+			checkBarrier(t, b, 10, 0, false)
+			if b.(*cyclicBarrier).barrierAction != nil {
+				t.Error("barrier have unexpected barrierAction")
+			}
+		},
+		func() {
+			defer func() {
+				if recover() == nil {
+					t.Error("Panic expected")
+				}
+			}()
+			_ = NewWithAction(0, func() error { return nil })
+		},
+		func() {
+			defer func() {
+				if recover() == nil {
+					t.Error("Panic expected")
+				}
+			}()
+			_ = NewWithAction(-1, func() error { return nil })
+		},
+	}
+	for _, test := range tests {
+		test()
+	}
+}
+
 func TestAwaitOnce(t *testing.T) {
 	n := 100 // goroutines count
 	b := New(n)
