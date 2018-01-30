@@ -315,3 +315,39 @@ func TestAwaitErrorInActionThenReset(t *testing.T) {
 	}
 	checkBarrier(t, b, n, 0, false)
 }
+
+func TestAwaitTooMuchGoroutines(t *testing.T) {
+
+	n := 100  // goroutines count
+	m := 1000 // inner cycle count
+	b := New(1)
+	ctx := context.Background()
+
+	var panicCount int32
+
+	wg := sync.WaitGroup{}
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(num int) {
+			defer func() {
+				if recover() != nil {
+					atomic.AddInt32(&panicCount, 1)
+				}
+				wg.Done()
+			}()
+			for j := 0; j < m; j++ {
+				err := b.Await(ctx)
+				if err != nil {
+					panic(err)
+				}
+			}
+		}(i)
+	}
+
+	wg.Wait()
+	checkBarrier(t, b, 1, 0, false)
+
+	if panicCount == 0 {
+		t.Error("barrier must panic when await is called from too much goroutines")
+	}
+}
