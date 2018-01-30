@@ -42,14 +42,14 @@ wg := sync.WaitGroup{}
 for i := 0; i < 10; i++ {           // create 10 goroutines (the same count as barrier parties)
     wg.Add(1)
     go func() {
-        for j := 0; j < 100; j++ {
+        for j := 0; j < 5; j++ {
             
-            // do some hard work 100 times
+            // do some hard work 5 times
             time.Sleep(100 * time.Millisecond)                     
             
-            err := b.Await(ctx)     // ..and wait on the barrier other parties.
-                                    // Last arrived goroutine will do the barrier action
-                                    // and then pass all other goroutines to the next round
+            err := b.Await(context.TODO()) // ..and wait for other parties on the barrier.
+                                           // Last arrived goroutine will do the barrier action
+                                           // and then pass all other goroutines to the next round
             if err != nil {
                 panic(err)
             }
@@ -59,7 +59,7 @@ for i := 0; i < 10; i++ {           // create 10 goroutines (the same count as b
 }
 
 wg.Wait()
-fmt.Println(cnt)                    // cnt = 100, it means that the barrier was passed 100 times
+fmt.Println(cnt)                    // cnt = 5, it means that the barrier was passed 5 times
 ```
 
 For more documentation see https://godoc.org/github.com/marusama/cyclicbarrier
