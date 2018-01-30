@@ -7,6 +7,7 @@ cyclicbarrier
 [![License](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](LICENSE)
 
 CyclicBarrier golang implementation.
+
 Inspired by Java CyclicBarrier https://docs.oracle.com/javase/9/docs/api/java/util/concurrent/CyclicBarrier.html and C# Barrier https://msdn.microsoft.com/en-us/library/system.threading.barrier(v=vs.110).aspx
 
 ### Usage
@@ -29,36 +30,36 @@ b.Reset()       // reset the barrier
 
 ### Simple example
 ```go
-    // create a barrier for 10 parties with an action that increments counter
-    // this action will be called each time when all goroutines reach the barrier
-	cnt := 0
-    b := cyclicbarrier.NewWithAction(10, func() error {
-		cnt++
-		return nil
-	})
+// create a barrier for 10 parties with an action that increments counter
+// this action will be called each time when all goroutines reach the barrier
+cnt := 0
+b := cyclicbarrier.NewWithAction(10, func() error {
+    cnt++
+    return nil
+})
 
-	wg := sync.WaitGroup{}
-	for i := 0; i < 10; i++ {           // create 10 goroutines (the same count as barrier parties)
-		wg.Add(1)
-		go func() {
-			for j := 0; j < 100; j++ {
-                
-                // do some hard work 100 times
-                time.Sleep(100 * time.Millisecond)                     
-                
-                err := b.Await(ctx)     // ..and wait on the barrier other parties.
-                                        // Last arrived goroutine will do the barrier action
-                                        // and then pass all other goroutines to the next round
-				if err != nil {
-					panic(err)
-				}
-			}
-			wg.Done()
-		}()
-	}
+wg := sync.WaitGroup{}
+for i := 0; i < 10; i++ {           // create 10 goroutines (the same count as barrier parties)
+    wg.Add(1)
+    go func() {
+        for j := 0; j < 100; j++ {
+            
+            // do some hard work 100 times
+            time.Sleep(100 * time.Millisecond)                     
+            
+            err := b.Await(ctx)     // ..and wait on the barrier other parties.
+                                    // Last arrived goroutine will do the barrier action
+                                    // and then pass all other goroutines to the next round
+            if err != nil {
+                panic(err)
+            }
+        }
+        wg.Done()
+    }()
+}
 
-    wg.Wait()
-    fmt.Println(cnt)                    // cnt = 100, it means that the barrier was passed 100 times
+wg.Wait()
+fmt.Println(cnt)                    // cnt = 100, it means that the barrier was passed 100 times
 ```
 
 For more documentation see https://godoc.org/github.com/marusama/cyclicbarrier
