@@ -303,6 +303,11 @@ func TestAwaitErrorInActionThenReset(t *testing.T) {
 		t.Error("expectedErrCount must be equal to", n-1, ", but it equals to", errBrokenBarrierCount)
 	}
 
+	// call await on broken barrier must return ErrBrokenBarrier
+	if b.Await(ctx) != ErrBrokenBarrier {
+		t.Error("call await on broken barrier must return ErrBrokenBarrier")
+	}
+
 	// do reset broken barrier
 	b.Reset()
 	if b.IsBroken() {
