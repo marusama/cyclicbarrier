@@ -2,6 +2,7 @@ package cyclicbarrier
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -255,4 +256,57 @@ func TestReset(t *testing.T) {
 
 	wg.Wait()
 	checkBarrier(t, b, n+1, 0, false)
+}
+
+func TestAwaitErrorInActionThenReset(t *testing.T) {
+	n := 100 // goroutines count
+	ctx := context.Background()
+
+	errExpected := errors.New("test error")
+
+	isActionCalled := false
+	var expectedErrCount, errBrokenBarrierCount int32
+
+	b := NewWithAction(n, func() error {
+		isActionCalled = true
+		return errExpected
+	})
+
+	wg := sync.WaitGroup{}
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func() {
+			err := b.Await(ctx)
+			if err == errExpected {
+				atomic.AddInt32(&expectedErrCount, 1)
+			} else if err == ErrBrokenBarrier {
+				atomic.AddInt32(&errBrokenBarrierCount, 1)
+			} else {
+				panic(err)
+			}
+			wg.Done()
+		}()
+	}
+
+	wg.Wait()
+	checkBarrier(t, b, n, n, true) // check that barrier is broken
+	if !isActionCalled {
+		t.Error("barrier action must be called")
+	}
+	if !b.IsBroken() {
+		t.Error("barrier must be broken via action error")
+	}
+	if expectedErrCount != 1 {
+		t.Error("expectedErrCount must be equal to", 1, ", but it equals to", expectedErrCount)
+	}
+	if errBrokenBarrierCount != int32(n-1) {
+		t.Error("expectedErrCount must be equal to", n-1, ", but it equals to", errBrokenBarrierCount)
+	}
+
+	// do reset broken barrier
+	b.Reset()
+	if b.IsBroken() {
+		t.Error("barrier must not be broken after reset")
+	}
+	checkBarrier(t, b, n, 0, false)
 }
