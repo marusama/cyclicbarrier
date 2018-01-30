@@ -230,3 +230,29 @@ func TestAwaitAction(t *testing.T) {
 		t.Error("cnt must be equal to = ", m, ", but it's ", cnt)
 	}
 }
+
+func TestReset(t *testing.T) {
+	n := 100        // goroutines count
+	b := New(n + 1) // parties are more than goroutines count so all goroutines will wait
+	ctx := context.Background()
+
+	go func() {
+		time.Sleep(30 * time.Millisecond)
+		b.Reset()
+	}()
+
+	wg := sync.WaitGroup{}
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func() {
+			err := b.Await(ctx)
+			if err != ErrBrokenBarrier {
+				panic(err)
+			}
+			wg.Done()
+		}()
+	}
+
+	wg.Wait()
+	checkBarrier(t, b, n+1, 0, false)
+}

@@ -145,7 +145,7 @@ func (b *cyclicBarrier) Await(ctx context.Context) error {
 		case <-brokeCh:
 			return ErrBrokenBarrier
 		case <-ctxDoneCh:
-			b.breakBarrier()
+			b.breakBarrier(true)
 			return ctx.Err()
 		}
 	} else {
@@ -153,7 +153,7 @@ func (b *cyclicBarrier) Await(ctx context.Context) error {
 		if b.barrierAction != nil {
 			err := b.barrierAction()
 			if err != nil {
-				b.breakBarrier()
+				b.breakBarrier(true)
 				return err
 			}
 		}
@@ -162,9 +162,11 @@ func (b *cyclicBarrier) Await(ctx context.Context) error {
 	}
 }
 
-func (b *cyclicBarrier) breakBarrier() {
-	b.lock.Lock()
-	defer b.lock.Unlock()
+func (b *cyclicBarrier) breakBarrier(needLock bool) {
+	if needLock {
+		b.lock.Lock()
+		defer b.lock.Unlock()
+	}
 
 	if !b.round.isBroken {
 		b.round.isBroken = true
@@ -183,7 +185,7 @@ func (b *cyclicBarrier) reset(safe bool) {
 		close(b.round.waitCh)
 
 	} else if b.round.count > 0 {
-		b.breakBarrier()
+		b.breakBarrier(false)
 	}
 
 	// create new round
