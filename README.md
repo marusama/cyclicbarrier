@@ -6,7 +6,7 @@ cyclicbarrier
 [![GoDoc](https://godoc.org/github.com/marusama/cyclicbarrier?status.svg)](https://godoc.org/github.com/marusama/cyclicbarrier)
 [![License](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](LICENSE)
 
-CyclicBarrier golang implementation.
+CyclicBarrier is a synchronizer that allows a set of goroutines to wait for each other to reach a common execution point, also called a barrier.
 
 Inspired by Java CyclicBarrier https://docs.oracle.com/javase/9/docs/api/java/util/concurrent/CyclicBarrier.html and C# Barrier https://msdn.microsoft.com/en-us/library/system.threading.barrier(v=vs.110).aspx
 
