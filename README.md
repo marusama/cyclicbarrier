@@ -1,5 +1,6 @@
 cyclicbarrier
 =============
+[![Awesome](https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg)](https://github.com/avelino/awesome-go#goroutines)
 [![Build Status](https://travis-ci.org/marusama/cyclicbarrier.svg?branch=master)](https://travis-ci.org/marusama/cyclicbarrier)
 [![Go Report Card](https://goreportcard.com/badge/github.com/marusama/cyclicbarrier)](https://goreportcard.com/report/github.com/marusama/cyclicbarrier)
 [![Coverage Status](https://coveralls.io/repos/github/marusama/cyclicbarrier/badge.svg?branch=master)](https://coveralls.io/github/marusama/cyclicbarrier?branch=master)
