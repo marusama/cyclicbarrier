@@ -7,6 +7,7 @@ package cyclicbarrier // import "github.com/marusama/cyclicbarrier"
 
 import (
 	"context"
+	"errors"
 	"sync"
 )
 
@@ -48,7 +49,7 @@ type CyclicBarrier interface {
 var (
 	// ErrBrokenBarrier error used when a goroutine tries to wait upon a barrier that is in a broken state,
 	// or which enters the broken state while the goroutine is waiting.
-	ErrBrokenBarrier error
+	ErrBrokenBarrier = errors.New("broken barrier")
 )
 
 // round
